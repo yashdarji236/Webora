@@ -2,19 +2,23 @@
   .gradient-primary {
     background: linear-gradient(135deg, #6D4AFF 0%, #FF4D8D 100%);
   }
+
   .gradient-primary-hover:hover {
     background: linear-gradient(135deg, #5D38F0 0%, #E63B78 100%);
   }
+
   .text-gradient {
     background: linear-gradient(135deg, #6D4AFF 0%, #FF4D8D 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
+
   .glass-panel {
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
+
   .dark .glass-panel {
     background: rgba(20, 20, 24, 0.85);
   }
@@ -30,20 +34,155 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   letter-spacing: -0.025em;
 }
 
-code, pre {
+code,
+pre {
   font-family: 'JetBrains Mono', monospace;
 }
 
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
+
+  *,
+  ::before,
+  ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+.animated-gradient-text {
+  background-image: linear-gradient(90deg,
+      #6D4AFF 0%,
+      #FF4D8D 50%,
+      #6D4AFF 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  display: inline;
+  animation: gradient-move 5s linear infinite;
+}
+
+@keyframes gradient-move {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 200% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-gradient-text {
+    animation: none;
+  }
+}
+
+.animated-gradient-text {
+  background-image: linear-gradient(90deg,
+      #6D4AFF 0%,
+      #FF4D8D 50%,
+      #6D4AFF 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  display: inline;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  animation: gradient-move 4s linear infinite;
+}
+
+@keyframes gradient-move {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 200% 50%;
+  }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-gradient-text {
+    animation: none;
+  }
+}
+
+.animated-gradient-text {
+  background-image: linear-gradient(90deg,
+      #7F011F 0%,
+      #F5EBD0 50%,
+      #7F011F 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  display: inline;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  animation: gradient-move 4s linear infinite;
+}
+
+@keyframes gradient-move {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 200% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-gradient-text {
+    animation: none;
+  }
+}
+
+.wave-layer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 200%;
+  animation-name: wave-slide;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.wave-reverse {
+  animation-direction: reverse;
+}
+
+@keyframes wave-slide {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wave-layer {
+    animation: none;
   }
 }

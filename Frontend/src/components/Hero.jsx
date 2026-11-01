@@ -12,7 +12,51 @@ const SearchIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
   </svg>
 );
+/* ─── Animated sand waves ────────────────────────────────────── */
+const WAVE_PATH = "M0 120 Q180 20 360 120 T720 120 T1080 120 T1440 120 V320 H0 Z";
 
+const Waves = () => (
+  <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+    {/* soft sand glow */}
+    <div
+      className="absolute inset-0"
+      style={{
+        background:
+          "radial-gradient(ellipse 80% 60% at 50% 20%, rgba(245,235,208,0.35) 0%, transparent 70%)",
+      }}
+    />
+
+    {/* back wave: slowest, faintest */}
+    <svg
+      className="wave-layer"
+      style={{ height: "55%", opacity: 0.25, animationDuration: "28s" }}
+      viewBox="0 0 1440 320"
+      preserveAspectRatio="none"
+    >
+      <path d={WAVE_PATH} fill="#F5EBD0" />
+    </svg>
+
+    {/* middle wave: opposite direction */}
+    <svg
+      className="wave-layer wave-reverse"
+      style={{ height: "42%", opacity: 0.4, animationDuration: "20s" }}
+      viewBox="0 0 1440 320"
+      preserveAspectRatio="none"
+    >
+      <path d={WAVE_PATH} fill="#F5EBD0" />
+    </svg>
+
+    {/* front wave: fastest, strongest */}
+    <svg
+      className="wave-layer"
+      style={{ height: "30%", opacity: 0.65, animationDuration: "14s" }}
+      viewBox="0 0 1440 320"
+      preserveAspectRatio="none"
+    >
+      <path d={WAVE_PATH} fill="#F5EBD0" />
+    </svg>
+  </div>
+);
 /* ─── Hero ───────────────────────────────────────────────────── */
 export const Hero = () => {
   const [auditUrl, setAuditUrl] = useState("");
@@ -27,34 +71,17 @@ export const Hero = () => {
 
   return (
     <section className="relative pt-28 pb-20 md:pt-36 md:pb-28 overflow-hidden">
-      {/* soft radial glow — centered */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 60% at 50% 20%, rgba(109,74,255,0.13) 0%, transparent 70%), radial-gradient(ellipse 50% 40% at 60% 80%, rgba(255,77,141,0.10) 0%, transparent 70%)",
-        }}
-      />
+      <Waves />
 
       <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
         <div className="flex flex-col items-center text-center max-w-3xl mx-auto">
 
           {/* H1 */}
           <h1
-            className="font-display font-extrabold text-[2.6rem] sm:text-5xl lg:text-[3.5rem] xl:text-[4rem] leading-[1.08] tracking-[-0.035em] mb-5 text-[#020617] dark:text-white"
+            className="font-display font-extrabold text-[2.6rem] sm:text-5xl lg:text-[3.5rem] xl:text-[4rem] leading-[1.08] tracking-[-0.035em] mb-5"
           >
-            Your SEO score,{" "}
-            <span
-              style={{
-                background: "linear-gradient(90deg,#6D4AFF 0%,#FF4D8D 100%)",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                color: "transparent",
-                display: "inline",
-              }}
-            >
+            <span className="animated-gradient-text">
+              Your SEO score,{" "}
               fixed in one pull&nbsp;request.
             </span>
           </h1>
@@ -69,47 +96,16 @@ export const Hero = () => {
           <div className="flex flex-wrap justify-center items-center gap-3 mb-6">
             <a
               href="https://github.com"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-white font-semibold text-[15px] shadow-md active:scale-95 transition-transform"
-              style={{ background: "linear-gradient(90deg,#6D4AFF 0%,#FF4D8D 100%)" }}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-[15px] shadow-md active:scale-95 transition-transform"
+              style={{
+                background: "linear-gradient(90deg,#7F011F 0%,#A8143A 100%)",
+                color: "#F5EBD0",
+              }}
             >
               <GitHubIcon />
               Continue with GitHub
             </a>
-            <a
-              href="#live-audit"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-slate-200 dark:border-white/20 text-slate-800 dark:text-slate-900 font-semibold text-[15px] bg-white hover:bg-slate-50 dark:bg-white dark:hover:bg-slate-100 shadow-sm transition-colors"
-            >
-              Audit a URL free
-            </a>
           </div>
-
-          {/* URL input */}
-          <form
-            id="live-audit"
-            onSubmit={handleAnalyze}
-            className="w-full max-w-md flex items-center gap-2 p-1.5 rounded-full bg-white dark:bg-[#1A1A22] border border-slate-200 dark:border-white/10 shadow-sm hover:border-violet-300 dark:hover:border-violet-700 focus-within:border-violet-400 dark:focus-within:border-violet-500 transition-colors mb-5"
-          >
-            <span className="pl-3 text-slate-400">
-              <SearchIcon />
-            </span>
-            <input
-              type="url"
-              required
-              placeholder="https://yoursite.com"
-              value={auditUrl}
-              onChange={(e) => setAuditUrl(e.target.value)}
-              className="flex-1 bg-transparent text-sm font-mono text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={isAuditing}
-              className="shrink-0 px-5 py-2 rounded-full text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-              style={{ background: "linear-gradient(90deg,#6D4AFF 0%,#FF4D8D 100%)" }}
-            >
-              {isAuditing ? "Scanning…" : "Analyze"}
-            </button>
-          </form>
-
           {/* trust line */}
           <p className="flex items-center gap-2 text-[13px] text-slate-400 dark:text-slate-500">
             <span className="w-1.5 h-1.5 rounded-full bg-[#16C784]" />
