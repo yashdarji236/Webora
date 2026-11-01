@@ -1,12 +1,94 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>MetaMend — Your SEO score, fixed in one pull request.</title>
+    <meta
+      name="description"
+      content="Audit your live site, see exactly what Google sees, and let MetaMend commit verified rule-based SEO fixes straight to your GitHub repository."
+    />
+    <meta name="keywords" content="SEO audit, GitHub PR, Open Graph preview, meta tags, accidental noindex, AI crawler controls, llms.txt" />
+    <link rel="canonical" href="https://metamend.dev" />
+
+    <!-- Open Graph / Social -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://metamend.dev" />
+    <meta property="og:title" content="MetaMend — Your SEO score, fixed in one pull request." />
+    <meta property="og:description" content="Deterministic, rule-based SEO audit & auto-fix bot for your GitHub repositories." />
+    <meta property="og:image" content="https://metamend.dev/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Google Fonts: Plus Jakarta Sans, Inter, JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind CSS with modern SaaS tokens (usefastlane inspired) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              canvas: {
+                light: '#FAFAF7',
+                dark: '#0C0C0E',
+              },
+              card: {
+                light: '#FFFFFF',
+                dark: '#141418',
+              },
+              brand: {
+                violet: '#6D4AFF',
+                pink: '#FF4D8D',
+                amber: '#FFB020',
+                green: '#16C784',
+                red: '#FF4D4F',
+              },
+            },
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
+              body: ['Inter', 'system-ui', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            },
+            borderRadius: {
+              '2xl': '16px',
+              '3xl': '24px',
+            },
+            boxShadow: {
+              subtle: '0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02)',
+              glow: '0 0 40px -10px rgba(109, 74, 255, 0.3)',
+              card: '0 10px 30px -5px rgba(0, 0, 0, 0.04), 0 20px 40px -15px rgba(0, 0, 0, 0.02)',
+              'card-hover': '0 20px 40px -10px rgba(109, 74, 255, 0.15)',
+            },
+          },
+        },
+      }
+    </script>
+
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "MetaMend",
+        "operatingSystem": "Web, GitHub Actions, CLI",
+        "applicationCategory": "DeveloperApplication, SEOApplication",
+        "description": "Deterministic rule-based SEO audit and automated GitHub pull request creator.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "INR"
+        }
+      }
+    </script>
   </head>
-  <body>
+  <body class="bg-[#FAFAF7] dark:bg-[#0C0C0E] text-slate-900 dark:text-slate-100 antialiased font-body transition-colors duration-200 selection:bg-[#6D4AFF]/20 selection:text-[#6D4AFF] overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
