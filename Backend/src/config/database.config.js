@@ -5,18 +5,17 @@ import { fileURLToPath } from "node:url";
 dotenv.config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
 
 const connectDB = async () => {
-    try {
-        const mongoUrl = process.env.MONGO_URL;
-        if (!mongoUrl) {
-            throw new Error("MONGO_URL is not set. Add it to Backend/.env or the environment.");
-        }
-        const conn = await mongoose.connect(mongoUrl);
-        console.log(`MongoDB Connected: ${conn.connection.host}`);
+  try {
+    const mongoUrl = process.env.MONGO_URL;
+    if (!mongoUrl) {
+      throw new Error("MONGO_URL is not set. Add it to Backend/.env or the environment.");
     }
-    catch (error) {
-        console.error(`Error: ${error.message}`);
-        process.exit(1);
-    }
+    const conn = await mongoose.connect(mongoUrl);
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.error(`MongoDB connection error: ${error.message}`);
+    throw error;
+  }
 };
 
 export default connectDB;

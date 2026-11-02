@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useAuth } from "../context/useAuth";
 
 /* ─── SVG icons ──────────────────────────────────────────────── */
 const GitHubIcon = () => (
@@ -7,11 +8,6 @@ const GitHubIcon = () => (
   </svg>
 );
 
-const SearchIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-  </svg>
-);
 /* ─── Animated sand waves ────────────────────────────────────── */
 const WAVE_PATH = "M0 120 Q180 20 360 120 T720 120 T1080 120 T1440 120 V320 H0 Z";
 
@@ -57,16 +53,20 @@ const Waves = () => (
     </svg>
   </div>
 );
+
 /* ─── Hero ───────────────────────────────────────────────────── */
 export const Hero = () => {
-  const [auditUrl, setAuditUrl] = useState("");
-  const [isAuditing, setIsAuditing] = useState(false);
+  const { user, isAuthenticated, loginWithGithub, navigateToDashboard, authError } = useAuth();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  const handleAnalyze = (e) => {
+  const handleCtaClick = (e) => {
     e.preventDefault();
-    if (!auditUrl) return;
-    setIsAuditing(true);
-    setTimeout(() => setIsAuditing(false), 1200);
+    if (isAuthenticated) {
+      navigateToDashboard();
+    } else {
+      setIsRedirecting(true);
+      loginWithGithub();
+    }
   };
 
   return (
@@ -75,6 +75,14 @@ export const Hero = () => {
 
       <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-10">
         <div className="flex flex-col items-center text-center max-w-3xl mx-auto">
+
+          {/* Auth Error Banner if OAuth failed */}
+          {authError && (
+            <div className="mb-6 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2 max-w-lg">
+              <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+              <span>Authentication error: {authError}</span>
+            </div>
+          )}
 
           {/* H1 */}
           <h1
@@ -94,18 +102,37 @@ export const Hero = () => {
 
           {/* CTA buttons */}
           <div className="flex flex-wrap justify-center items-center gap-3 mb-6">
-            <a
-              href="https://github.com"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-[15px] shadow-md active:scale-95 transition-transform"
+            <button
+              onClick={handleCtaClick}
+              disabled={isRedirecting}
+              className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full font-semibold text-[15px] shadow-lg active:scale-95 transition-all cursor-pointer hover:opacity-95"
               style={{
                 background: "linear-gradient(90deg,#7F011F 0%,#A8143A 100%)",
                 color: "#F5EBD0",
               }}
             >
-              <GitHubIcon />
-              Continue with GitHub
-            </a>
+              {isRedirecting ? (
+                <>
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  <span>Connecting with GitHub...</span>
+                </>
+              ) : isAuthenticated ? (
+                <>
+                  <GitHubIcon />
+                  <span>Jump into Dashboard (@{user?.username}) →</span>
+                </>
+              ) : (
+                <>
+                  <GitHubIcon />
+                  <span>Continue with GitHub</span>
+                </>
+              )}
+            </button>
           </div>
+
           {/* trust line */}
           <p className="flex items-center gap-2 text-[13px] text-slate-400 dark:text-slate-500">
             <span className="w-1.5 h-1.5 rounded-full bg-[#16C784]" />

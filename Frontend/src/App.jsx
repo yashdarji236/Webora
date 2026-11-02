@@ -1,4 +1,6 @@
 import React from "react";
+import { AuthProvider } from "./context/AuthContext";
+import { useAuth } from "./context/useAuth";
 import { Navbar } from "./components/Navbar";
 import { Hero } from "./components/Hero";
 import { SocialProof } from "./components/SocialProof";
@@ -11,8 +13,24 @@ import { Pricing } from "./components/Pricing";
 import { Faq } from "./components/Faq";
 import { CtaBanner } from "./components/CtaBanner";
 import { Footer } from "./components/Footer";
+import { Dashboard } from "./components/Dashboard";
 
-function App() {
+function AppContent() {
+  const { view, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#000000] text-white flex flex-col items-center justify-center space-y-4">
+        <div className="w-9 h-9 border-2 border-white/20 border-t-rose-500 rounded-full animate-spin" />
+        <p className="text-sm font-medium text-slate-400">Authenticating with GitHub...</p>
+      </div>
+    );
+  }
+
+  if (view === "dashboard") {
+    return <Dashboard />;
+  }
+
   return (
     <div className="min-h-screen bg-[#000000] text-slate-100 flex flex-col selection:bg-[#0066FF]/30 selection:text-white">
       {/* 1. NAVBAR */}
@@ -55,6 +73,14 @@ function App() {
       {/* 12. FOOTER */}
       <Footer />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/useAuth";
 
 export const Navbar = () => {
+  const { user, isAuthenticated, loginWithGithub, logout, navigateToDashboard, navigateToLanding } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
@@ -53,7 +55,11 @@ export const Navbar = () => {
           {/* Logo */}
           <a
             href="/"
-            className="flex items-center gap-2.5 text-white hover:opacity-90 transition-opacity focus:outline-none"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateToLanding();
+            }}
+            className="flex items-center gap-2.5 text-white hover:opacity-90 transition-opacity focus:outline-none cursor-pointer"
             aria-label="MetaMend Home"
           >
             {/* MetaMend Geometric Symbol: Dual-Chevron / Code Brackets 'M' */}
@@ -241,31 +247,67 @@ export const Navbar = () => {
           </div>
         </div>
 
-        {/* Right Side: Log in & Sign up button */}
-        <div className="hidden md:flex items-center gap-5">
-          <a
-            href="#login"
-            className="text-[14px] font-medium text-[#CCCCCC] hover:text-white transition-colors"
-          >
-            Log in
-          </a>
+        {/* Right Side: Log in & Sign up button / Dashboard pill */}
+        <div className="hidden md:flex items-center gap-4">
+          {isAuthenticated ? (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={navigateToDashboard}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/15 transition-all cursor-pointer shadow-sm"
+              >
+                {user?.avatar && (
+                  <img
+                    src={user.avatar}
+                    alt={user.username}
+                    className="w-5 h-5 rounded-full border border-white/20"
+                  />
+                )}
+                <span>Dashboard ({user?.username})</span>
+              </button>
+              <button
+                onClick={logout}
+                className="text-[13px] font-medium text-[#999999] hover:text-white transition-colors cursor-pointer"
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <button
+                onClick={loginWithGithub}
+                className="text-[14px] font-medium text-[#CCCCCC] hover:text-white transition-colors cursor-pointer"
+              >
+                Log in
+              </button>
 
-          <a
-            href="#signup"
-            className="bg-white text-black font-semibold text-[14px] px-3.5 py-1.5 rounded-full hover:bg-[#E5E5E5] transition-all duration-150 active:scale-95 shadow-sm"
-          >
-            Sign up
-          </a>
+              <button
+                onClick={loginWithGithub}
+                className="bg-white text-black font-semibold text-[14px] px-3.5 py-1.5 rounded-full hover:bg-[#E5E5E5] transition-all duration-150 active:scale-95 shadow-sm cursor-pointer"
+              >
+                Sign up
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Mobile menu button */}
         <div className="flex md:hidden items-center gap-3">
-          <a
-            href="#signup"
-            className="bg-white text-black font-semibold text-xs px-3 py-1.5 rounded-full hover:bg-neutral-200 transition-colors"
-          >
-            Sign up
-          </a>
+          {isAuthenticated ? (
+            <button
+              onClick={navigateToDashboard}
+              className="bg-white text-black font-semibold text-xs px-3 py-1.5 rounded-full hover:bg-neutral-200 transition-colors"
+            >
+              Dashboard
+            </button>
+          ) : (
+            <button
+              onClick={loginWithGithub}
+              className="bg-white text-black font-semibold text-xs px-3 py-1.5 rounded-full hover:bg-neutral-200 transition-colors"
+            >
+              Sign up
+            </button>
+          )}
+
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 text-white hover:text-slate-300 transition-colors focus:outline-none"
@@ -324,20 +366,49 @@ export const Navbar = () => {
           </div>
 
           <div className="pt-3 border-t border-white/10 flex flex-col gap-2.5">
-            <a
-              href="#login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full text-center py-2 text-sm font-medium text-white hover:text-slate-300"
-            >
-              Log in
-            </a>
-            <a
-              href="#signup"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full text-center py-2 rounded-full text-sm font-semibold bg-white text-black hover:bg-neutral-200 transition-colors"
-            >
-              Sign up
-            </a>
+            {isAuthenticated ? (
+              <>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigateToDashboard();
+                  }}
+                  className="w-full text-center py-2 rounded-full text-sm font-semibold bg-white text-black hover:bg-neutral-200 transition-colors"
+                >
+                  Go to Dashboard (@{user?.username})
+                </button>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    logout();
+                  }}
+                  className="w-full text-center py-2 text-sm font-medium text-slate-400 hover:text-white"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    loginWithGithub();
+                  }}
+                  className="w-full text-center py-2 text-sm font-medium text-white hover:text-slate-300"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    loginWithGithub();
+                  }}
+                  className="w-full text-center py-2 rounded-full text-sm font-semibold bg-white text-black hover:bg-neutral-200 transition-colors"
+                >
+                  Sign up
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

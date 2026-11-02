@@ -8,11 +8,10 @@ export const ScoreRing = ({
   label = "SEO Health",
   animate = true,
 }) => {
-  const [score, setScore] = useState(initialScore);
+  const [animatedScore, setAnimatedScore] = useState(initialScore);
 
   useEffect(() => {
     if (!animate) {
-      setScore(targetScore);
       return;
     }
 
@@ -24,7 +23,7 @@ export const ScoreRing = ({
       const progress = Math.min(elapsed / duration, 1);
       const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
       const current = Math.round(initialScore + (targetScore - initialScore) * ease);
-      setScore(current);
+      setAnimatedScore(current);
 
       if (progress < 1) {
         requestAnimationFrame(updateScore);
@@ -35,6 +34,7 @@ export const ScoreRing = ({
     return () => cancelAnimationFrame(handle);
   }, [initialScore, targetScore, animate]);
 
+  const score = animate ? animatedScore : targetScore;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
@@ -69,8 +69,8 @@ export const ScoreRing = ({
         />
         <defs>
           <linearGradient id="score-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#6D4AFF" />
-            <stop offset="100%" stopColor="#FF4D8D" />
+            <stop offset="0%" stopColor="#10B981" />
+            <stop offset="100%" stopColor="#34D399" />
           </linearGradient>
         </defs>
       </svg>

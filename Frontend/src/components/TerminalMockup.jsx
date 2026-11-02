@@ -2,7 +2,6 @@ import React, { useState } from "react";
 
 export const TerminalMockup = ({ targetUrl = "https://mysite.com", interactive = true }) => {
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState("audit");
   const command = `npx metamend audit ${targetUrl}`;
 
   const handleCopy = () => {
@@ -98,4 +97,3 @@ export const TerminalMockup = ({ targetUrl = "https://mysite.com", interactive =
     </div>
   );
 };
-
