@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import repositoryAnalysisRoutes from "./routes/repositoryAnalysisRoutes.js";
 import { githubCallback } from "./controllers/auth.controller.js";
 
 // Ensure .env is loaded regardless of process cwd
@@ -34,6 +35,10 @@ app.get("/github/callback", githubCallback);
 // User routes
 app.use("/api/user", userRoutes);
 app.use("/user", userRoutes);
+
+// Repository Analysis & Framework Detection routes (Feature 1)
+app.use("/api/analysis", repositoryAnalysisRoutes);
+app.use("/api/projects", repositoryAnalysisRoutes);
 
 // 404 handler
 app.use((req, res) => {
