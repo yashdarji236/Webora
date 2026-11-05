@@ -13,12 +13,15 @@ import { detectDeployment } from "../services/analyzer/deploymentDetector.js";
  * Helper to resolve repo owner and name
  */
 function resolveOwnerAndRepo(req, user) {
-  let owner = req.params.owner || req.body.owner || req.query.owner || "";
-  let repo = req.params.repo || req.body.repo || req.query.repo || "";
-
-  if (!repo && req.params.projectId) {
-    repo = req.params.projectId;
-  }
+  let owner = req.params?.owner || req.query?.owner || req.body?.owner || "";
+  let repo =
+    req.params?.repo ||
+    req.query?.repo ||
+    req.body?.repo ||
+    req.query?.repoName ||
+    req.body?.repoName ||
+    req.params?.projectId ||
+    "";
 
   // If repo is in "owner/repo" format
   if (repo.includes("/")) {
@@ -32,7 +35,7 @@ function resolveOwnerAndRepo(req, user) {
     owner = user.username;
   }
 
-  return { owner: owner.trim(), repo: repo.trim() };
+  return { owner: (owner || "").trim(), repo: (repo || "").trim() };
 }
 
 /**
@@ -201,7 +204,11 @@ export const getRepositoryAnalysis = async (req, res) => {
 
     const analysis = await RepositoryAnalysis.findOne({
       userId: user._id,
-      "repository.fullName": fullName,
+      $or: [
+        { "repository.fullName": fullName },
+        { "repository.fullName": { $regex: new RegExp(`/${repo}$`, "i") } },
+        { "repository.name": repo },
+      ],
     });
 
     if (!analysis) {

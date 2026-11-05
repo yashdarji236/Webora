@@ -120,9 +120,9 @@ function extractHtmlMetadata(html) {
  */
 export const getRepoOverview = async (req, res) => {
   try {
-    const repoParam = req.query.repo || req.body.repoName || req.body.repo;
-    const urlParam = req.query.url || req.body.url;
-    let ownerParam = req.query.owner || req.body.owner;
+    const repoParam = req.query?.repo || req.body?.repoName || req.body?.repo;
+    const urlParam = req.query?.url || req.body?.url;
+    let ownerParam = req.query?.owner || req.body?.owner;
 
     if (!repoParam) {
       return res.status(400).json({
