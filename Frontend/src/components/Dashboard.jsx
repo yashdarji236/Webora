@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "../context/useAuth";
 import { Navbar } from "./Navbar";
 import { RepositoryAnalysis } from "./RepositoryAnalysis";
+import { SeoAuditReport } from "./SeoAuditReport";
 import {
   LayoutGrid,
   Search,
@@ -264,6 +265,86 @@ export const Dashboard = () => {
     [token, runRepositoryAnalysis]
   );
 
+  // ─── 4C. LIVE WEBSITE CRAWLER & SEO AUDIT STATE (FEATURE 2) ─────────────────
+  const [liveAuditData, setLiveAuditData] = useState(null);
+  const [isRunningLiveAudit, setIsRunningLiveAudit] = useState(false);
+  const [liveAuditStep, setLiveAuditStep] = useState(1);
+
+  // Load latest audit from database
+  const loadLatestAudit = useCallback(
+    async (slug) => {
+      if (!slug || !token) return;
+      try {
+        const res = await fetch(`/api/audit/latest?projectId=${encodeURIComponent(slug)}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.audit) {
+            setLiveAuditData(data.audit);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load latest audit:", err.message);
+      }
+    },
+    [token]
+  );
+
+  // Execute live website crawl and audit
+  const runLiveAudit = useCallback(
+    async (customUrl = null) => {
+      if (!route.repoSlug || !token) return;
+      setIsRunningLiveAudit(true);
+      setLiveAuditStep(1);
+
+      // Realistic progress step progression
+      const stepInterval = setInterval(() => {
+        setLiveAuditStep((prev) => (prev < 11 ? prev + 1 : prev));
+      }, 700);
+
+      try {
+        const targetUrl =
+          customUrl ||
+          activeProject?.url ||
+          repoDetails?.repo?.homepage ||
+          analysisData?.repository?.homepage ||
+          "";
+
+        const res = await fetch("/api/audit/run", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            projectId: route.repoSlug,
+            repo: route.repoSlug,
+            url: targetUrl,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.audit) {
+            setLiveAuditStep(12);
+            setLiveAuditData(data.audit);
+          }
+        }
+      } catch (err) {
+        console.warn("Audit execution failed:", err.message);
+      } finally {
+        clearInterval(stepInterval);
+        setTimeout(() => {
+          setIsRunningLiveAudit(false);
+        }, 500);
+      }
+    },
+    [token, route.repoSlug, activeProject, repoDetails, analysisData]
+  );
+
   // Fetch real repository inspection from backend
   const loadRepoDetails = useCallback(
     async (slug, customUrl) => {
@@ -310,6 +391,7 @@ export const Dashboard = () => {
         if (active) {
           loadRepoDetails(route.repoSlug, activeUrl);
           loadExistingAnalysis(route.repoSlug);
+          loadLatestAudit(route.repoSlug);
         }
       }, 0);
       return () => {
@@ -317,7 +399,7 @@ export const Dashboard = () => {
         clearTimeout(timer);
       };
     }
-  }, [route.isProjectView, route.repoSlug, activeProject?.url, loadRepoDetails, loadExistingAnalysis]);
+  }, [route.isProjectView, route.repoSlug, activeProject?.url, loadRepoDetails, loadExistingAnalysis, loadLatestAudit]);
 
   // Re-run Audit button
   const handleRunAudit = async () => {
@@ -379,7 +461,6 @@ export const Dashboard = () => {
   };
 
   const issuesList = repoDetails?.audit?.issues || [];
-  const checksList = repoDetails?.audit?.checks || [];
   const frameworkName = analysisData?.framework?.name || repoDetails?.repo?.framework || activeProject?.framework || "Web Application";
 
   return (
@@ -474,7 +555,7 @@ export const Dashboard = () => {
                       </div>
                       {!isSidebarCollapsed && (
                         <span className="text-xs font-mono text-neutral-400">
-                          {issuesList.length}
+                          {liveAuditData?.audit?.totalIssues ?? issuesList.length}
                         </span>
                       )}
                     </button>
@@ -700,15 +781,27 @@ export const Dashboard = () => {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => {
-                      runRepositoryAnalysis(route.repoSlug);
-                      handleRunAudit();
+                      if (route.activeTab === "audit") {
+                        runLiveAudit();
+                      } else {
+                        runRepositoryAnalysis(route.repoSlug);
+                        handleRunAudit();
+                      }
                     }}
-                    disabled={isAuditing || isLoadingRepo || isAnalyzingRepo}
+                    disabled={isAuditing || isLoadingRepo || isAnalyzingRepo || isRunningLiveAudit}
                     className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-black hover:bg-neutral-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    <RefreshCw size={13} className={isAuditing || isLoadingRepo || isAnalyzingRepo ? "animate-spin" : ""} />
+                    <RefreshCw size={13} className={isAuditing || isLoadingRepo || isAnalyzingRepo || isRunningLiveAudit ? "animate-spin" : ""} />
                     <span>
-                      {isAuditing ? `Inspecting (${auditProgress}%)` : isAnalyzingRepo ? "Analyzing repo..." : isLoadingRepo ? "Fetching repo..." : "Re-inspect repo"}
+                      {isRunningLiveAudit
+                        ? `Auditing (${liveAuditStep}/12)`
+                        : isAuditing
+                        ? `Inspecting (${auditProgress}%)`
+                        : isAnalyzingRepo
+                        ? "Analyzing repo..."
+                        : isLoadingRepo
+                        ? "Fetching repo..."
+                        : "Re-audit site"}
                     </span>
                   </button>
 
@@ -750,43 +843,21 @@ export const Dashboard = () => {
                         onReanalyze={() => runRepositoryAnalysis(route.repoSlug)}
                         onStartAudit={() => {
                           navigateToHash(`dashboard/${route.repoSlug}/audit`);
-                          handleRunAudit();
+                          runLiveAudit();
                         }}
                       />
                     )}
 
-                    {/* ─── TAB 2: AUDIT RESULTS ─── */}
+                    {/* ─── TAB 2: AUDIT RESULTS (LIVE CRAWL & COMPREHENSIVE SEO AUDIT) ─── */}
                     {route.activeTab === "audit" && (
-                      <div className="space-y-6">
-                        <div>
-                          <h1 className="text-2xl font-bold text-white tracking-tight">Audit Checklist</h1>
-                          <p className="text-xs text-neutral-400 mt-1">
-                            Real technical evaluation for {repoDetails?.repo?.fullName || activeProject.name}.
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl border border-[#22222A] bg-[#121216] divide-y divide-[#1E1E23]">
-                          {checksList.map((chk, i) => (
-                            <div key={i} className="p-4 flex items-center justify-between text-xs">
-                              <div>
-                                <h3 className="font-bold text-white">{chk.name}</h3>
-                                <p className="text-neutral-400 mt-0.5">{chk.details}</p>
-                              </div>
-                              <span
-                                className={`px-2 py-1 rounded text-[11px] font-mono font-bold capitalize ${
-                                  chk.status === "passed"
-                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                    : chk.status === "warning"
-                                    ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                                    : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                }`}
-                              >
-                                {chk.status}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                      <SeoAuditReport
+                        auditData={liveAuditData}
+                        isRunningAudit={isRunningLiveAudit}
+                        auditStep={liveAuditStep}
+                        onRunAudit={() => runLiveAudit()}
+                        onUpdateUrl={(newUrl) => runLiveAudit(newUrl)}
+                        onContinueToPreviews={() => navigateToHash(`dashboard/${route.repoSlug}/previews`)}
+                      />
                     )}
 
                     {/* ─── TAB 3: FIXES ─── */}
