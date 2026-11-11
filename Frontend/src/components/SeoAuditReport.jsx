@@ -9,14 +9,11 @@ import {
   ChevronDown,
   ChevronRight,
   Globe,
-  FileSpreadsheet,
-  Link2,
   Layers,
   Sparkles,
   Zap,
   Clock,
   ArrowRight,
-  Filter,
   Search,
   Wrench,
   AlertCircle,
@@ -113,9 +110,13 @@ const SeverityBadge = ({ severity }) => {
 
 /* ─── MAIN SEO AUDIT REPORT COMPONENT ────────────────────────────── */
 export const SeoAuditReport = ({
+  repoName = "",
+  detectedUrl = "",
   auditData,
+  isLoadingAudit = false,
   isRunningAudit,
   auditStep = 1,
+  auditError = null,
   onRunAudit,
   onUpdateUrl,
   onContinueToPreviews,
@@ -125,6 +126,7 @@ export const SeoAuditReport = ({
   const [expandedIssueId, setExpandedIssueId] = useState(null);
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [customUrlInput, setCustomUrlInput] = useState("");
+  const [inlineUrl, setInlineUrl] = useState("");
 
   const audit = auditData?.audit || {};
   const categories = auditData?.categories || {};
@@ -224,8 +226,105 @@ export const SeoAuditReport = ({
     }
   };
 
+  if (isLoadingAudit && !auditData && !isRunningAudit) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-6 select-none">
+        <div className="text-center space-y-3">
+          <RefreshCw size={24} className="animate-spin text-neutral-400 mx-auto" />
+          <p className="text-xs font-mono text-neutral-400">
+            Loading audit results for {repoName || "repository"}...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!auditData && !isRunningAudit) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-6 select-none">
+        <div className="w-full max-w-lg p-8 rounded-2xl border border-[#22222A] bg-[#121216] text-center space-y-5 shadow-2xl">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-white/[0.04] border border-neutral-800 flex items-center justify-center text-rose-400">
+            <Globe size={26} strokeWidth={1.7} />
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-neutral-500">
+              {repoName || "Repository Audit"}
+            </span>
+            <h2 className="text-2xl font-extrabold text-white tracking-tight">
+              No SEO Audit Loaded
+            </h2>
+            <p className="text-xs text-neutral-400 leading-relaxed max-w-md mx-auto">
+              Run a live crawl for{" "}
+              <code className="text-neutral-200 font-mono">{repoName || "this repository"}</code>{" "}
+              to inspect technical SEO, metadata, OpenGraph tags, and calculate a real SEO score.
+            </p>
+          </div>
+
+          {auditError && (
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-left flex items-start gap-2.5 text-xs text-rose-300">
+              <AlertCircle size={15} className="shrink-0 mt-0.5 text-rose-400" />
+              <div className="space-y-1">
+                <p className="font-semibold text-rose-200">{auditError}</p>
+                <p className="text-[11px] text-rose-300/80">
+                  Enter a valid public deployed URL below to run the audit.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="text-left space-y-1.5">
+            <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold block">
+              Deployed Website URL {detectedUrl ? "(Auto-detected)" : "(Optional or Custom URL)"}
+            </label>
+            <input
+              type="text"
+              placeholder={detectedUrl || "https://your-deployed-site.com"}
+              value={inlineUrl}
+              onChange={(e) => setInlineUrl(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B0B0D] border border-[#22222A] text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-600 font-mono"
+            />
+          </div>
+
+          <div className="pt-1 flex items-center justify-center">
+            <button
+              onClick={() => {
+                const chosen = inlineUrl.trim();
+                if (chosen && onUpdateUrl) {
+                  onUpdateUrl(chosen);
+                } else if (onRunAudit) {
+                  onRunAudit();
+                }
+              }}
+              className="px-7 py-3 rounded-xl font-bold text-xs sm:text-sm text-black bg-white hover:bg-neutral-200 transition-all active:scale-95 shadow-lg inline-flex items-center gap-2 cursor-pointer"
+            >
+              <span>Start SEO Audit</span>
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 select-none">
+      {/* ─── ERROR BANNER (If re-audit failed while previous audit shown) ─── */}
+      {auditError && !isRunningAudit && (
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 text-xs text-rose-200">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle size={16} className="text-rose-400 shrink-0" />
+            <span>{auditError}</span>
+          </div>
+          <button
+            onClick={() => setShowUrlModal(true)}
+            className="px-3 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-semibold shrink-0 cursor-pointer"
+          >
+            Update URL
+          </button>
+        </div>
+      )}
+
       {/* ─── PROGRESS SCANNER (When isRunningAudit is true) ───────────── */}
       {isRunningAudit && (
         <div className="p-6 rounded-2xl border border-rose-500/30 bg-[#121216] relative overflow-hidden shadow-2xl">
@@ -275,8 +374,10 @@ export const SeoAuditReport = ({
         </div>
       )}
 
-      {/* ─── SECTION A: SEO HEALTH OVERVIEW ─────────────────────────── */}
-      <div className="p-6 sm:p-8 rounded-2xl border border-[#22222A] bg-[#121216] relative overflow-hidden space-y-6">
+      {auditData && (
+        <>
+          {/* ─── SECTION A: SEO HEALTH OVERVIEW ─────────────────────────── */}
+          <div className="p-6 sm:p-8 rounded-2xl border border-[#22222A] bg-[#121216] relative overflow-hidden space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-6">
             <CircularScoreRing score={audit.overallScore ?? 0} grade={audit.grade || "F"} />
@@ -679,6 +780,8 @@ export const SeoAuditReport = ({
           <ArrowRight size={16} />
         </button>
       </div>
+        </>
+      )}
 
       {/* ─── MODAL: MANUAL URL VERIFICATION DIALOG ────────────────────── */}
       {showUrlModal && (

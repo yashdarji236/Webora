@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 export const Dashboard = () => {
-  const { user, token } = useAuth();
+  const { user, token, loginWithGithub } = useAuth();
 
   // ─── 1. ROUTING STATE ───────────────────────────────────────────────────────
   const getHashRoute = () => {
@@ -67,6 +67,11 @@ export const Dashboard = () => {
   });
 
   const [repos, setRepos] = useState([]);
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+  const [reposError, setReposError] = useState(null);
+  const [requiresGithubReconnect, setRequiresGithubReconnect] = useState(false);
+  const [repoSearch, setRepoSearch] = useState("");
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeNav, setActiveNav] = useState("Projects");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -77,50 +82,95 @@ export const Dashboard = () => {
   const [newProjectUrl, setNewProjectUrl] = useState("");
   const [selectedRepoForNew, setSelectedRepoForNew] = useState("");
 
-  // Fetch GitHub repos for picker
-  useEffect(() => {
-    const fetchRepos = async () => {
-      try {
-        const res = await fetch("/api/user/repos", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.repos)) {
-            setRepos(data.repos);
-          }
-        }
-      } catch (err) {
-        console.warn("Could not fetch user repos:", err.message);
-      }
-    };
+  // Fetch GitHub repos for picker (with proxy fallback + explicit error reporting)
+  const fetchRepos = useCallback(async () => {
+    if (!token) {
+      setReposError("Please sign in with GitHub to load your repositories.");
+      setRequiresGithubReconnect(true);
+      return;
+    }
 
-    if (token) {
-      fetchRepos();
+    setIsLoadingRepos(true);
+    setReposError(null);
+
+    try {
+      let res;
+      try {
+        res = await fetch("/api/user/repos", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok && res.status >= 500) throw new Error("Proxy failed");
+      } catch {
+        res = await fetch("http://localhost:5000/api/user/repos", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setReposError(data.message || `Failed to load repositories (HTTP ${res.status}).`);
+        if (res.status === 401) setRequiresGithubReconnect(true);
+        return;
+      }
+
+      if (data.success && Array.isArray(data.repos)) {
+        setRepos(data.repos);
+        setRequiresGithubReconnect(Boolean(data.requiresGithubReconnect));
+        if (data.warning) {
+          setReposError(data.warning);
+        } else if (data.repos.length === 0 && data.message) {
+          setReposError(data.message);
+        }
+      } else {
+        setReposError(data.message || "Unable to fetch repositories.");
+      }
+    } catch (err) {
+      console.warn("Could not fetch user repos:", err.message);
+      setReposError("Could not connect to backend server to fetch GitHub repositories.");
+    } finally {
+      setIsLoadingRepos(false);
     }
   }, [token]);
+
+  useEffect(() => {
+    let active = true;
+    if (token) {
+      const timer = setTimeout(() => {
+        if (active) {
+          fetchRepos();
+        }
+      }, 0);
+      return () => {
+        active = false;
+        clearTimeout(timer);
+      };
+    }
+  }, [token, fetchRepos]);
 
   // Create Project & Navigate to /dashboard/{repo name}
   const handleCreateNewProject = (e) => {
     e.preventDefault();
-    const name = newProjectName.trim() || selectedRepoForNew || "My project";
+    const matchedRepo = repos.find(
+      (r) => r.fullName === selectedRepoForNew || r.name === selectedRepoForNew
+    );
+    const name = newProjectName.trim() || matchedRepo?.name || selectedRepoForNew || "My project";
     const slug = name.toLowerCase().replace(/[^a-z0-9-_]/g, "-");
     const rawUrl = newProjectUrl.trim();
     const formattedUrl = rawUrl
-      ? rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`
-      : selectedRepoForNew
-      ? `https://github.com/${user?.username || "user"}/${selectedRepoForNew}`
-      : `https://${slug}.com`;
+      ? rawUrl.startsWith("http")
+        ? rawUrl
+        : `https://${rawUrl}`
+      : matchedRepo?.homepage || "";
 
     const newProj = {
       id: Date.now(),
       name,
+      fullName: matchedRepo?.fullName || name,
       slug,
       url: formattedUrl,
-      branch: "main",
-      framework: "Next.js",
+      branch: matchedRepo?.defaultBranch || "main",
+      framework: matchedRepo?.language || "Web App",
       createdAt: new Date().toLocaleDateString(),
       status: "unverified",
       hasAudited: false,
@@ -138,6 +188,7 @@ export const Dashboard = () => {
     setNewProjectName("");
     setNewProjectUrl("");
     setSelectedRepoForNew("");
+    setRepoSearch("");
 
     // Redirect to /dashboard/{repo name}
     navigateToHash(`dashboard/${slug}`);
@@ -172,7 +223,7 @@ export const Dashboard = () => {
       id: "adhoc",
       name: route.repoSlug,
       slug: route.repoSlug,
-      url: `https://${route.repoSlug}.com`,
+      url: "",
       branch: "main",
       framework: "Next.js",
       createdAt: "Today",
@@ -267,27 +318,40 @@ export const Dashboard = () => {
 
   // ─── 4C. LIVE WEBSITE CRAWLER & SEO AUDIT STATE (FEATURE 2) ─────────────────
   const [liveAuditData, setLiveAuditData] = useState(null);
+  const [isLoadingLiveAudit, setIsLoadingLiveAudit] = useState(false);
   const [isRunningLiveAudit, setIsRunningLiveAudit] = useState(false);
   const [liveAuditStep, setLiveAuditStep] = useState(1);
+  const [liveAuditError, setLiveAuditError] = useState(null);
 
-  // Load latest audit from database
+  // Load latest audit from database (strictly scoped to current repo slug)
   const loadLatestAudit = useCallback(
     async (slug) => {
       if (!slug || !token) return;
+      setIsLoadingLiveAudit(true);
       try {
-        const res = await fetch(`/api/audit/latest?projectId=${encodeURIComponent(slug)}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const res = await fetch(
+          `/api/audit/latest?projectId=${encodeURIComponent(slug)}&repo=${encodeURIComponent(slug)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.audit) {
             setLiveAuditData(data.audit);
+          } else {
+            setLiveAuditData(null);
           }
+        } else {
+          setLiveAuditData(null);
         }
       } catch (err) {
         console.warn("Could not load latest audit:", err.message);
+        setLiveAuditData(null);
+      } finally {
+        setIsLoadingLiveAudit(false);
       }
     },
     [token]
@@ -298,6 +362,7 @@ export const Dashboard = () => {
     async (customUrl = null) => {
       if (!route.repoSlug || !token) return;
       setIsRunningLiveAudit(true);
+      setLiveAuditError(null);
       setLiveAuditStep(1);
 
       // Realistic progress step progression
@@ -306,12 +371,19 @@ export const Dashboard = () => {
       }, 700);
 
       try {
-        const targetUrl =
-          customUrl ||
-          activeProject?.url ||
+        const candidateProjectUrl =
+          activeProject?.url && !/^https?:\/\/(www\.)?github\.com\//i.test(activeProject.url)
+            ? activeProject.url
+            : "";
+        const candidateHomepage =
           repoDetails?.repo?.homepage ||
           analysisData?.repository?.homepage ||
+          analysisData?.deployment?.deploymentUrl ||
           "";
+        const safeHomepage = /^https?:\/\/(www\.)?github\.com\//i.test(candidateHomepage)
+          ? ""
+          : candidateHomepage;
+        const targetUrl = customUrl || candidateProjectUrl || safeHomepage || "";
 
         const res = await fetch("/api/audit/run", {
           method: "POST",
@@ -326,15 +398,17 @@ export const Dashboard = () => {
           }),
         });
 
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.audit) {
-            setLiveAuditStep(12);
-            setLiveAuditData(data.audit);
-          }
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success && data.audit) {
+          setLiveAuditStep(12);
+          setLiveAuditData(data.audit);
+          setLiveAuditError(null);
+        } else {
+          setLiveAuditError(data.message || "Could not complete SEO audit for this repository.");
         }
       } catch (err) {
         console.warn("Audit execution failed:", err.message);
+        setLiveAuditError(err.message || "Network error while executing SEO audit.");
       } finally {
         clearInterval(stepInterval);
         setTimeout(() => {
@@ -389,6 +463,10 @@ export const Dashboard = () => {
       const activeUrl = activeProject?.url || "";
       const timer = setTimeout(() => {
         if (active) {
+          setLiveAuditData(null);
+          setLiveAuditError(null);
+          setAnalysisData(null);
+          setRepoDetails(null);
           loadRepoDetails(route.repoSlug, activeUrl);
           loadExistingAnalysis(route.repoSlug);
           loadLatestAudit(route.repoSlug);
@@ -460,8 +538,13 @@ export const Dashboard = () => {
     setTimeout(() => setIsCopiedBadge(false), 2000);
   };
 
-  const issuesList = repoDetails?.audit?.issues || [];
   const frameworkName = analysisData?.framework?.name || repoDetails?.repo?.framework || activeProject?.framework || "Web Application";
+  const detectedWebsiteUrl =
+    (activeProject?.url && !/^https?:\/\/(www\.)?github\.com\//i.test(activeProject.url) ? activeProject.url : "") ||
+    (repoDetails?.repo?.homepage && !/^https?:\/\/(www\.)?github\.com\//i.test(repoDetails.repo.homepage) ? repoDetails.repo.homepage : "") ||
+    (analysisData?.repository?.homepage && !/^https?:\/\/(www\.)?github\.com\//i.test(analysisData.repository.homepage) ? analysisData.repository.homepage : "") ||
+    analysisData?.deployment?.deploymentUrl ||
+    "";
 
   return (
     <div className="min-h-screen bg-[#0E0E10] text-[#E0E0E0] flex flex-col font-sans selection:bg-neutral-800 selection:text-white">
@@ -555,7 +638,7 @@ export const Dashboard = () => {
                       </div>
                       {!isSidebarCollapsed && (
                         <span className="text-xs font-mono text-neutral-400">
-                          {liveAuditData?.audit?.totalIssues ?? issuesList.length}
+                          {liveAuditData?.audit?.totalIssues ?? 0}
                         </span>
                       )}
                     </button>
@@ -822,7 +905,7 @@ export const Dashboard = () => {
 
               {/* Main Content */}
               <main className="flex-1 p-6 sm:p-10 max-w-7xl w-full mx-auto space-y-8">
-                {isLoadingRepo ? (
+                {isLoadingRepo && route.activeTab !== "audit" ? (
                   <div className="space-y-6 animate-pulse">
                     <div className="h-8 bg-neutral-800 rounded w-1/3" />
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -851,9 +934,13 @@ export const Dashboard = () => {
                     {/* ─── TAB 2: AUDIT RESULTS (LIVE CRAWL & COMPREHENSIVE SEO AUDIT) ─── */}
                     {route.activeTab === "audit" && (
                       <SeoAuditReport
+                        repoName={repoDetails?.repo?.fullName || activeProject.name}
+                        detectedUrl={detectedWebsiteUrl}
                         auditData={liveAuditData}
+                        isLoadingAudit={isLoadingLiveAudit}
                         isRunningAudit={isRunningLiveAudit}
                         auditStep={liveAuditStep}
+                        auditError={liveAuditError}
                         onRunAudit={() => runLiveAudit()}
                         onUpdateUrl={(newUrl) => runLiveAudit(newUrl)}
                         onContinueToPreviews={() => navigateToHash(`dashboard/${route.repoSlug}/previews`)}
@@ -1261,7 +1348,12 @@ export const Dashboard = () => {
 
                     {/* + Create new project card */}
                     <div
-                      onClick={() => setShowNewModal(true)}
+                      onClick={() => {
+                        setShowNewModal(true);
+                        if (repos.length === 0 || reposError) {
+                          fetchRepos();
+                        }
+                      }}
                       className="h-40 rounded-xl border border-dashed border-[#262630] hover:border-neutral-500 hover:bg-white/[0.02] flex items-center justify-center p-6 transition-all cursor-pointer group"
                     >
                       <div className="flex items-center gap-2 text-sm font-semibold text-neutral-400 group-hover:text-white transition-colors">
@@ -1292,34 +1384,112 @@ export const Dashboard = () => {
             </div>
 
             <form onSubmit={handleCreateNewProject} className="space-y-4">
-              {repos.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-neutral-300 mb-1.5">
+              {/* Always visible GitHub Repository Selection */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-neutral-300">
                     Select from your GitHub Repositories
                   </label>
-                  <select
-                    value={selectedRepoForNew}
-                    onChange={(e) => {
-                      setSelectedRepoForNew(e.target.value);
-                      if (e.target.value) {
-                        setNewProjectName(e.target.value);
-                        const matched = repos.find((r) => r.name === e.target.value);
-                        if (matched?.homepage) {
-                          setNewProjectUrl(matched.homepage);
-                        }
-                      }
-                    }}
-                    className="w-full px-3 py-2 rounded-lg bg-[#18181D] border border-[#2E2E38] text-white text-xs focus:outline-none focus:border-neutral-400"
+                  <button
+                    type="button"
+                    onClick={fetchRepos}
+                    disabled={isLoadingRepos}
+                    className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    <option value="">Choose a repository...</option>
-                    {repos.map((r) => (
-                      <option key={r.id} value={r.name}>
-                        {r.fullName || r.name} ({r.language || "Code"})
-                      </option>
-                    ))}
-                  </select>
+                    <RefreshCw size={11} className={isLoadingRepos ? "animate-spin" : ""} />
+                    <span>{isLoadingRepos ? "Loading..." : "Refresh"}</span>
+                  </button>
                 </div>
-              )}
+
+                {isLoadingRepos && repos.length === 0 ? (
+                  <div className="px-3 py-3 rounded-lg bg-[#18181D] border border-[#2E2E38] flex items-center gap-2.5 text-xs text-neutral-400">
+                    <RefreshCw size={14} className="animate-spin text-neutral-400 shrink-0" />
+                    <span>Fetching your GitHub repositories...</span>
+                  </div>
+                ) : repos.length > 0 ? (
+                  <div className="space-y-2">
+                    {repos.length > 5 && (
+                      <div className="relative">
+                        <Search size={13} className="absolute left-2.5 top-2.5 text-neutral-500" />
+                        <input
+                          type="text"
+                          placeholder="Filter repositories..."
+                          value={repoSearch}
+                          onChange={(e) => setRepoSearch(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#141418] border border-[#2E2E38] text-white text-xs placeholder:text-neutral-600 focus:outline-none focus:border-neutral-400"
+                        />
+                      </div>
+                    )}
+
+                    <select
+                      value={selectedRepoForNew}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedRepoForNew(val);
+                        if (val) {
+                          const matched = repos.find(
+                            (r) => r.fullName === val || r.name === val
+                          );
+                          setNewProjectName(matched?.name || val);
+                          setNewProjectUrl(matched?.homepage || "");
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-lg bg-[#18181D] border border-[#2E2E38] text-white text-xs focus:outline-none focus:border-neutral-400"
+                    >
+                      <option value="">Choose a repository...</option>
+                      {repos
+                        .filter((r) =>
+                          !repoSearch.trim() ||
+                          (r.fullName || r.name)
+                            .toLowerCase()
+                            .includes(repoSearch.trim().toLowerCase())
+                        )
+                        .map((r) => (
+                          <option key={r.id} value={r.name}>
+                            {r.fullName || r.name} ({r.isPrivate ? "Private" : "Public"} · {r.language || "Code"})
+                          </option>
+                        ))}
+                    </select>
+
+                    {requiresGithubReconnect && (
+                      <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-2 text-[11px] text-amber-300">
+                        <span>Showing public repos only.</span>
+                        <button
+                          type="button"
+                          onClick={loginWithGithub}
+                          className="underline font-semibold hover:text-amber-200 shrink-0 cursor-pointer"
+                        >
+                          Reconnect GitHub
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-lg bg-[#18181D] border border-[#2E2E38] space-y-2.5 text-xs">
+                    <p className="text-neutral-400">
+                      {reposError || "No repositories were loaded from your GitHub account."}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={fetchRepos}
+                        className="px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-[11px] font-medium cursor-pointer"
+                      >
+                        Retry
+                      </button>
+                      {(requiresGithubReconnect || !token) && (
+                        <button
+                          type="button"
+                          onClick={loginWithGithub}
+                          className="px-2.5 py-1 rounded bg-white text-black hover:bg-neutral-200 text-[11px] font-semibold cursor-pointer"
+                        >
+                          Reconnect GitHub
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div>
                 <label className="block text-xs font-medium text-neutral-300 mb-1.5">

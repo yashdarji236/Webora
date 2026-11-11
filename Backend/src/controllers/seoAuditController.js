@@ -52,20 +52,28 @@ export const runSeoAudit = async (req, res) => {
     const { projectId, repoName, fullName } = resolveProjectAndRepo(req, user);
 
     // 1. Identify Target Website URL
-    let targetUrl = req.body?.url || req.query?.url || "";
+    let targetUrl = (req.body?.url || req.query?.url || "").trim();
+
+    // Never treat a GitHub repository URL as the deployed website URL
+    if (targetUrl && /^https?:\/\/(www\.)?github\.com\//i.test(targetUrl)) {
+      targetUrl = "";
+    }
 
     // If not in body/query, check repository analysis record for homepage or deploymentUrl
-    if (!targetUrl && fullName) {
+    if (!targetUrl && fullName && repoName) {
       const existingAnalysis = await RepositoryAnalysis.findOne({
         userId: user._id,
         $or: [{ "repository.fullName": fullName }, { "repository.name": repoName }],
       });
 
       if (existingAnalysis) {
-        targetUrl =
+        const candidate =
           existingAnalysis.repository?.homepage ||
           existingAnalysis.deployment?.deploymentUrl ||
           "";
+        if (candidate && !/^https?:\/\/(www\.)?github\.com\//i.test(candidate)) {
+          targetUrl = candidate.trim();
+        }
       }
     }
 
@@ -195,9 +203,21 @@ export const getLatestAudit = async (req, res) => {
 
     const { projectId, repoName, fullName } = resolveProjectAndRepo(req, user);
 
+    if (!projectId && !repoName) {
+      return res.status(400).json({
+        success: false,
+        message: "Repository or project identifier is required.",
+      });
+    }
+
+    const orConditions = [];
+    if (projectId) orConditions.push({ projectId });
+    if (repoName && fullName) orConditions.push({ repoFullName: fullName });
+    if (repoName) orConditions.push({ projectId: repoName });
+
     const latestAudit = await SeoAudit.findOne({
       userId: user._id,
-      $or: [{ projectId }, { repoFullName: fullName }, { projectId: repoName }],
+      $or: orConditions,
     }).sort({ createdAt: -1 });
 
     if (!latestAudit) {

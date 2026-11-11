@@ -1,63 +1,111 @@
 import User from "../models/user.model.js";
 
+const mapGithubRepos = (reposData) =>
+  Array.isArray(reposData)
+    ? reposData.map((r) => ({
+        id: r.id,
+        name: r.name,
+        fullName: r.full_name,
+        description: r.description || "",
+        htmlUrl: r.html_url,
+        homepage: r.homepage || "",
+        language: r.language || "TypeScript",
+        isPrivate: Boolean(r.private),
+        stars: r.stargazers_count ?? 0,
+        forks: r.forks_count ?? 0,
+        updatedAt: r.updated_at,
+        defaultBranch: r.default_branch || "main",
+      }))
+    : [];
+
 /**
  * GET /api/user/repos
- * Fetches user's GitHub repositories using their stored OAuth accessToken.
+ * Fetches user's GitHub repositories using their stored OAuth accessToken,
+ * falling back to public GitHub repositories if token is missing/expired.
  */
 export const getUserRepos = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
-    if (!user || !user.accessToken) {
-      return res.status(200).json({
-        success: true,
+    if (!user) {
+      return res.status(401).json({
+        success: false,
         repos: [],
-        message: "No GitHub access token available to fetch repositories.",
+        requiresGithubReconnect: true,
+        message: "Authenticated user not found.",
       });
     }
 
-    const ghResponse = await fetch("https://api.github.com/user/repos?sort=updated&per_page=30", {
-      headers: {
-        Authorization: `Bearer ${user.accessToken}`,
-        "User-Agent": "MetaMend-SEOForge",
-        Accept: "application/vnd.github+json",
-      },
-    });
+    let warning = "";
+    let requiresGithubReconnect = false;
 
-    if (!ghResponse.ok) {
-      return res.status(200).json({
-        success: true,
-        repos: [],
-        warning: `GitHub returned status ${ghResponse.status}`,
-      });
+    if (user.accessToken) {
+      const ghResponse = await fetch(
+        "https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member",
+        {
+          headers: {
+            Authorization: `Bearer ${user.accessToken}`,
+            "User-Agent": "MetaMend-SEOForge",
+            Accept: "application/vnd.github+json",
+          },
+        }
+      );
+
+      if (ghResponse.ok) {
+        const reposData = await ghResponse.json();
+        return res.status(200).json({
+          success: true,
+          repos: mapGithubRepos(reposData),
+          requiresGithubReconnect: false,
+        });
+      }
+
+      requiresGithubReconnect = ghResponse.status === 401 || ghResponse.status === 403;
+      warning = `GitHub API returned status ${ghResponse.status}.`;
+    } else {
+      requiresGithubReconnect = true;
+      warning = "No GitHub OAuth token stored for your session.";
     }
 
-    const reposData = await ghResponse.json();
+    // Fallback: attempt to fetch public repositories by GitHub username
+    if (user.username) {
+      try {
+        const publicRes = await fetch(
+          `https://api.github.com/users/${encodeURIComponent(user.username)}/repos?sort=updated&per_page=100`,
+          {
+            headers: {
+              "User-Agent": "MetaMend-SEOForge",
+              Accept: "application/vnd.github+json",
+            },
+          }
+        );
 
-    const repos = Array.isArray(reposData)
-      ? reposData.map((r) => ({
-          id: r.id,
-          name: r.name,
-          fullName: r.full_name,
-          description: r.description || "",
-          htmlUrl: r.html_url,
-          homepage: r.homepage || "",
-          language: r.language || "TypeScript",
-          isPrivate: r.private,
-          stars: r.stargazers_count,
-          forks: r.forks_count,
-          updatedAt: r.updated_at,
-          defaultBranch: r.default_branch,
-        }))
-      : [];
+        if (publicRes.ok) {
+          const publicData = await publicRes.json();
+          return res.status(200).json({
+            success: true,
+            repos: mapGithubRepos(publicData),
+            requiresGithubReconnect,
+            warning: warning
+              ? `${warning} Showing public repositories — reconnect GitHub to access private repos.`
+              : "",
+          });
+        }
+      } catch (fallbackErr) {
+        console.warn("Public repo fallback failed:", fallbackErr.message);
+      }
+    }
 
     return res.status(200).json({
       success: true,
-      repos,
+      repos: [],
+      requiresGithubReconnect,
+      warning: warning || "Could not load repositories from GitHub.",
     });
   } catch (error) {
     console.error("Error fetching user repos:", error);
     return res.status(500).json({
       success: false,
+      repos: [],
       message: "Failed to fetch repositories from GitHub",
       error: error.message,
     });
