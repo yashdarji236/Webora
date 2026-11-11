@@ -38,6 +38,7 @@ function resolveProjectAndRepo(req, user) {
   };
 }
 
+
 /**
  * POST /api/audit/run or POST /api/projects/:projectId/audit
  * Executes live website crawl and comprehensive SEO audit
@@ -138,6 +139,31 @@ export const runSeoAudit = async (req, res) => {
     // 5. Calculate Deterministic SEO Health Score
     const scoringResult = calculateSeoScore(allIssues);
 
+    // Extract homepage metadata snapshot (immutable baseline for Feature 3 previews)
+    const homepage = crawlResult.pages[0] || {};
+    const extractedMetadata = {
+      title: homepage.title || "",
+      description: homepage.metaDescription || "",
+      canonical: homepage.canonical || "",
+      favicon: homepage.favicon || "",
+      htmlLang: homepage.htmlLang || "",
+      openGraph: {
+        title: homepage.openGraph?.title || "",
+        description: homepage.openGraph?.description || "",
+        image: homepage.openGraph?.image || "",
+        url: homepage.openGraph?.url || "",
+        type: homepage.openGraph?.type || "",
+        siteName: homepage.openGraph?.siteName || "",
+      },
+      twitter: {
+        card: homepage.twitter?.card || "",
+        title: homepage.twitter?.title || "",
+        description: homepage.twitter?.description || "",
+        image: homepage.twitter?.image || "",
+        site: homepage.twitter?.site || "",
+      },
+    };
+
     // 6. Persist Audit Report to MongoDB
     const auditDoc = new SeoAudit({
       userId: user._id,
@@ -171,6 +197,7 @@ export const runSeoAudit = async (req, res) => {
         sitemap: crawlResult.sitemap,
       },
       performance: performance.metrics,
+      metadata: extractedMetadata,
     });
 
     const savedAudit = await auditDoc.save();

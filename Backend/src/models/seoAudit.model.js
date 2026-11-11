@@ -93,6 +93,28 @@ const seoAuditSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: {},
     },
+    metadata: {
+      title: { type: String, default: "" },
+      description: { type: String, default: "" },
+      canonical: { type: String, default: "" },
+      favicon: { type: String, default: "" },
+      htmlLang: { type: String, default: "" },
+      openGraph: {
+        title: { type: String, default: "" },
+        description: { type: String, default: "" },
+        image: { type: String, default: "" },
+        url: { type: String, default: "" },
+        type: { type: String, default: "" },
+        siteName: { type: String, default: "" },
+      },
+      twitter: {
+        card: { type: String, default: "" },
+        title: { type: String, default: "" },
+        description: { type: String, default: "" },
+        image: { type: String, default: "" },
+        site: { type: String, default: "" },
+      },
+    },
   },
   { timestamps: true }
 );

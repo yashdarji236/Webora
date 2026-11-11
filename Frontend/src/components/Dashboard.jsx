@@ -3,6 +3,7 @@ import { useAuth } from "../context/useAuth";
 import { Navbar } from "./Navbar";
 import { RepositoryAnalysis } from "./RepositoryAnalysis";
 import { SeoAuditReport } from "./SeoAuditReport";
+import { SocialPreviews } from "./SocialPreviews";
 import {
   LayoutGrid,
   Search,
@@ -357,6 +358,43 @@ export const Dashboard = () => {
     [token]
   );
 
+  // ─── 4D. VISUAL SOCIAL & SEARCH PREVIEWS STATE (FEATURE 3) ──────────────────
+  const [previewData, setPreviewData] = useState(null);
+  const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
+
+  const loadProjectPreviews = useCallback(
+    async (slug) => {
+      if (!slug || !token) return;
+      setIsLoadingPreviews(true);
+      try {
+        const res = await fetch(
+          `/api/projects/${encodeURIComponent(slug)}/previews?repo=${encodeURIComponent(slug)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            setPreviewData(data);
+          } else {
+            setPreviewData(null);
+          }
+        } else {
+          setPreviewData(null);
+        }
+      } catch (err) {
+        console.warn("Could not load social previews:", err.message);
+        setPreviewData(null);
+      } finally {
+        setIsLoadingPreviews(false);
+      }
+    },
+    [token]
+  );
+
   // Execute live website crawl and audit
   const runLiveAudit = useCallback(
     async (customUrl = null) => {
@@ -403,6 +441,7 @@ export const Dashboard = () => {
           setLiveAuditStep(12);
           setLiveAuditData(data.audit);
           setLiveAuditError(null);
+          loadProjectPreviews(route.repoSlug);
         } else {
           setLiveAuditError(data.message || "Could not complete SEO audit for this repository.");
         }
@@ -416,7 +455,7 @@ export const Dashboard = () => {
         }, 500);
       }
     },
-    [token, route.repoSlug, activeProject, repoDetails, analysisData]
+    [token, route.repoSlug, activeProject, repoDetails, analysisData, loadProjectPreviews]
   );
 
   // Fetch real repository inspection from backend
@@ -465,11 +504,13 @@ export const Dashboard = () => {
         if (active) {
           setLiveAuditData(null);
           setLiveAuditError(null);
+          setPreviewData(null);
           setAnalysisData(null);
           setRepoDetails(null);
           loadRepoDetails(route.repoSlug, activeUrl);
           loadExistingAnalysis(route.repoSlug);
           loadLatestAudit(route.repoSlug);
+          loadProjectPreviews(route.repoSlug);
         }
       }, 0);
       return () => {
@@ -477,7 +518,7 @@ export const Dashboard = () => {
         clearTimeout(timer);
       };
     }
-  }, [route.isProjectView, route.repoSlug, activeProject?.url, loadRepoDetails, loadExistingAnalysis, loadLatestAudit]);
+  }, [route.isProjectView, route.repoSlug, activeProject?.url, loadRepoDetails, loadExistingAnalysis, loadLatestAudit, loadProjectPreviews]);
 
   // Re-run Audit button
   const handleRunAudit = async () => {
@@ -527,7 +568,6 @@ export const Dashboard = () => {
   // UI States
   const [isCopiedBadge, setIsCopiedBadge] = useState(false);
   const [actionToggle, setActionToggle] = useState(true);
-  const [previewPlatform, setPreviewPlatform] = useState("google");
 
   const copyMarkdownBadge = () => {
     if (!activeProject) return;
@@ -905,7 +945,7 @@ export const Dashboard = () => {
 
               {/* Main Content */}
               <main className="flex-1 p-6 sm:p-10 max-w-7xl w-full mx-auto space-y-8">
-                {isLoadingRepo && route.activeTab !== "audit" ? (
+                {isLoadingRepo && route.activeTab !== "audit" && route.activeTab !== "previews" ? (
                   <div className="space-y-6 animate-pulse">
                     <div className="h-8 bg-neutral-800 rounded w-1/3" />
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1070,109 +1110,17 @@ export const Dashboard = () => {
                       </div>
                     )}
 
-                    {/* ─── TAB 5: PREVIEWS ─── */}
+                    {/* ─── TAB 5: PREVIEWS (FEATURE 3: VISUAL SOCIAL & SEARCH PREVIEWS) ─── */}
                     {route.activeTab === "previews" && (
-                      <div className="space-y-6">
-                        <div>
-                          <h1 className="text-2xl font-bold text-white tracking-tight">Search & Social Previews</h1>
-                          <p className="text-xs text-neutral-400 mt-1">
-                            Visual previews based on real metadata for {repoDetails?.repo?.name || activeProject.name}.
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2 border-b border-[#22222A] pb-3 text-xs font-semibold">
-                          {[
-                            { id: "google", label: "Google Search" },
-                            { id: "whatsapp", label: "WhatsApp Card" },
-                            { id: "linkedin", label: "LinkedIn Post" },
-                            { id: "twitter", label: "X / Twitter Card" },
-                          ].map((p) => (
-                            <button
-                              key={p.id}
-                              onClick={() => setPreviewPlatform(p.id)}
-                              className={`px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                                previewPlatform === p.id
-                                  ? "bg-white/[0.08] text-white"
-                                  : "text-neutral-400 hover:text-white"
-                              }`}
-                            >
-                              {p.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="p-8 rounded-xl border border-[#22222A] bg-[#121216] flex items-center justify-center min-h-[260px]">
-                          {previewPlatform === "google" && (
-                            <div className="bg-[#18181D] p-5 rounded-lg border border-[#2E2E38] max-w-xl w-full space-y-1">
-                              <span className="text-[11px] text-neutral-400 block">
-                                {repoDetails?.audit?.liveUrl || activeProject.url}
-                              </span>
-                              <h3 className="text-base text-rose-400 hover:underline font-semibold cursor-pointer">
-                                {fixForm.title || repoDetails?.repo?.name || activeProject.name}
-                              </h3>
-                              <p className="text-xs text-neutral-300 leading-relaxed">
-                                {fixForm.description || "No description specified yet."}
-                              </p>
-                            </div>
-                          )}
-
-                          {previewPlatform === "whatsapp" && (
-                            <div className="bg-[#161F1B] p-4 rounded-xl max-w-sm w-full border border-emerald-900/40 space-y-2">
-                              <div className="w-full h-32 bg-neutral-900 rounded-lg flex items-center justify-center text-xs font-mono text-neutral-400 overflow-hidden">
-                                {fixForm.ogImageUrl ? (
-                                  <img src={fixForm.ogImageUrl} alt="og preview" className="w-full h-full object-cover" />
-                                ) : (
-                                  "[ OpenGraph Card Image ]"
-                                )}
-                              </div>
-                              <h4 className="font-bold text-xs text-white line-clamp-1">
-                                {fixForm.title || repoDetails?.repo?.name || activeProject.name}
-                              </h4>
-                              <p className="text-[11px] text-neutral-400 line-clamp-2">
-                                {fixForm.description || "Preview card description..."}
-                              </p>
-                              <span className="text-[10px] text-neutral-500 font-mono block uppercase">
-                                {repoDetails?.repo?.name || activeProject.slug}
-                              </span>
-                            </div>
-                          )}
-
-                          {previewPlatform === "linkedin" && (
-                            <div className="bg-[#18181D] border border-[#2E2E38] rounded-lg max-w-md w-full overflow-hidden">
-                              <div className="w-full h-36 bg-neutral-900 flex items-center justify-center text-xs font-mono text-neutral-400">
-                                [ og:image preview ]
-                              </div>
-                              <div className="p-3 bg-[#141418] border-t border-[#22222A]">
-                                <h4 className="font-bold text-xs text-white line-clamp-1">
-                                  {fixForm.title || activeProject.name}
-                                </h4>
-                                <span className="text-[10px] text-neutral-400 font-mono">
-                                  {repoDetails?.audit?.liveUrl || activeProject.url}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-
-                          {previewPlatform === "twitter" && (
-                            <div className="bg-black border border-neutral-800 rounded-xl max-w-md w-full overflow-hidden">
-                              <div className="w-full h-36 bg-neutral-900 flex items-center justify-center text-xs font-mono text-neutral-400">
-                                [ summary_large_image ]
-                              </div>
-                              <div className="p-3 bg-neutral-950">
-                                <span className="text-[10px] text-neutral-500 font-mono">
-                                  {repoDetails?.audit?.liveUrl || activeProject.url}
-                                </span>
-                                <h4 className="font-bold text-xs text-white line-clamp-1 mt-0.5">
-                                  {fixForm.title || activeProject.name}
-                                </h4>
-                                <p className="text-[11px] text-neutral-400 line-clamp-2 mt-0.5">
-                                  {fixForm.description || "Card description..."}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <SocialPreviews
+                        key={`${route.repoSlug}-${previewData?.auditId || "none"}`}
+                        repoName={repoDetails?.repo?.fullName || activeProject.name}
+                        projectSlug={route.repoSlug}
+                        token={token}
+                        previewData={previewData}
+                        isLoadingPreviews={isLoadingPreviews}
+                        onNavigateToAudit={() => navigateToHash(`dashboard/${route.repoSlug}/audit`)}
+                      />
                     )}
 
                     {/* ─── TAB 6: MONITORING ─── */}
