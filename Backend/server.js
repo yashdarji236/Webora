@@ -1,7 +1,10 @@
 import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
 
+// Load .env from Backend directory first, then root workspace directory
+dotenv.config({ path: fileURLToPath(new URL("./.env", import.meta.url)) });
 dotenv.config({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
+dotenv.config();
 
 import app from "./src/app.js";
 import Connect from "./src/config/database.config.js";

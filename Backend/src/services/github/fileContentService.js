@@ -11,31 +11,45 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_READ_SIZE_BYTES = 1024 * 1024; // 1 MB limit per file
 
 /**
- * Fetch raw content of a file in the repository
- * @param {string} owner
- * @param {string} repo
- * @param {string} path
- * @param {string} branch
- * @param {string} accessToken
+ * Fetch raw content of a file in the repository (supports both positional and object arguments)
+ * @param {string|Object} ownerOrOptions
+ * @param {string} [repo]
+ * @param {string} [path]
+ * @param {string} [branch='main']
+ * @param {string} [accessToken]
  * @returns {Promise<string|null>} decoded text content or null if not found
  */
-export async function fetchFileContent(owner, repo, path, branch = "main", accessToken) {
-  if (!path) return null;
-  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-  const cacheKey = `${owner}/${repo}:${branch}:${cleanPath}`;
+export async function fetchFileContent(ownerOrOptions, repo, path, branch = "main", accessToken) {
+  let owner = ownerOrOptions;
+  let targetRepo = repo;
+  let targetPath = path;
+  let targetBranch = branch;
+  let targetToken = accessToken;
+
+  if (ownerOrOptions && typeof ownerOrOptions === "object") {
+    owner = ownerOrOptions.owner;
+    targetRepo = ownerOrOptions.repo;
+    targetPath = path || ownerOrOptions.path;
+    targetBranch = ownerOrOptions.branch || branch || "main";
+    targetToken = ownerOrOptions.accessToken || accessToken;
+  }
+
+  if (!owner || !targetRepo || !targetPath) return null;
+  const cleanPath = targetPath.startsWith("/") ? targetPath.slice(1) : targetPath;
+  const cacheKey = `${owner}/${targetRepo}:${targetBranch}:${cleanPath}`;
 
   const cached = fileCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return cached.content;
   }
 
-  const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${encodeURIComponent(cleanPath)}?ref=${encodeURIComponent(branch)}`;
+  const url = `${GITHUB_API_BASE}/repos/${owner}/${targetRepo}/contents/${encodeURIComponent(cleanPath)}?ref=${encodeURIComponent(targetBranch)}`;
   const headers = {
     Accept: "application/vnd.github+json",
     "User-Agent": "MetaMend-Repo-Inspector",
   };
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
+  if (targetToken) {
+    headers.Authorization = `Bearer ${targetToken}`;
   }
 
   try {

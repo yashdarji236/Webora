@@ -16,7 +16,9 @@ import {
   Sparkles,
   Check,
   ShieldCheck,
+  GitPullRequest,
 } from "lucide-react";
+import PreviewPublishModal from "./PreviewPublishModal";
 
 /* ─── CLIENT-SIDE DETERMINISTIC FALLBACK & PREVIEW HELPERS ───────── */
 function resolveClientUrl(raw, baseUrl) {
@@ -533,6 +535,10 @@ export const SocialPreviews = ({
   const [twitterCardOverride, setTwitterCardOverride] = useState(null);
   const [comparePlatform, setComparePlatform] = useState("google");
 
+  // Pull Request publish modal state
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [lastPublishedPr, setLastPublishedPr] = useState(null);
+
   // Image server validation state
   const [imageCheckState, setImageCheckState] = useState({
     checking: false,
@@ -584,6 +590,7 @@ export const SocialPreviews = ({
     setProposedMetadata(null);
     setTwitterCardOverride(null);
     setImageCheckState({ checking: false, result: null });
+    setLastPublishedPr(null);
   };
 
   const handleVerifyImage = async (imgUrl) => {
@@ -693,17 +700,50 @@ export const SocialPreviews = ({
 
         <div className="flex items-center gap-2">
           {hasChanges && (
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <RotateCcw size={13} />
-              <span>Reset Proposed</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <RotateCcw size={13} />
+                <span>Reset Proposed</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPublishModalOpen(true)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-white hover:bg-neutral-200 text-black inline-flex items-center gap-2 cursor-pointer transition-all active:scale-95 shadow-lg shadow-white/10"
+              >
+                <GitPullRequest size={14} />
+                <span>Send Pull Request</span>
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Success Alert if PR was just opened */}
+      {lastPublishedPr && (
+        <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-between gap-3 text-xs text-emerald-200">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+            <span>
+              Pull Request <strong>#{lastPublishedPr.prNumber || ""}</strong> successfully opened on main repository!
+            </span>
+          </div>
+          {lastPublishedPr.prUrl && (
+            <a
+              href={lastPublishedPr.prUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs inline-flex items-center gap-1.5 transition-colors shadow-md shadow-emerald-500/20"
+            >
+              <span>View PR #{lastPublishedPr.prNumber}</span>
+              <ExternalLink size={12} />
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Critical Distinction Disclaimer */}
       <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-start gap-2.5 text-xs text-amber-200/90">
@@ -830,6 +870,41 @@ export const SocialPreviews = ({
                     Use a valid https:// absolute canonical URL.
                   </p>
                 )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-mono uppercase text-neutral-400 font-bold">
+                    Favicon
+                  </label>
+                  <span className="text-[10px] font-mono text-neutral-500">
+                    /favicon.ico, /favicon.svg, or https://
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#0B0B0D] border border-[#22222A] flex items-center justify-center overflow-hidden shrink-0">
+                    {effectiveProposed.favicon ? (
+                      <img
+                        src={effectiveProposed.favicon}
+                        alt="favicon preview"
+                        className="w-4 h-4 object-contain"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <Globe size={14} className="text-neutral-500" />
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={viewMode === "before" ? originalMetadata.favicon : effectiveProposed.favicon}
+                    disabled={viewMode === "before"}
+                    onChange={(e) => updateBasicField("favicon", e.target.value)}
+                    placeholder="/favicon.ico or /favicon.svg"
+                    className="w-full px-3 py-2 rounded-xl bg-[#0B0B0D] border border-[#22222A] text-xs text-white font-mono placeholder-neutral-600 focus:outline-none focus:border-neutral-500 disabled:opacity-60"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -1306,6 +1381,39 @@ export const SocialPreviews = ({
           </div>
         </div>
       </div>
+
+      {/* Floating Bottom Bar for Fast Pull Request Submission */}
+      {hasChanges && (
+        <div className="fixed bottom-6 right-6 z-40 p-3 sm:p-4 rounded-2xl border border-purple-500/30 bg-[#121217]/95 shadow-2xl backdrop-blur-md flex items-center gap-3 sm:gap-4 text-xs animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-white font-medium hidden sm:inline">
+              Preview edits ready
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsPublishModalOpen(true)}
+            className="px-4 py-2 rounded-xl font-bold bg-white text-black hover:bg-neutral-200 inline-flex items-center gap-2 shadow-lg cursor-pointer transition-all active:scale-95 text-xs"
+          >
+            <GitPullRequest size={14} />
+            <span>Send Pull Request</span>
+          </button>
+        </div>
+      )}
+
+      {/* Preview Pull Request Modal */}
+      <PreviewPublishModal
+        isOpen={isPublishModalOpen}
+        onClose={() => setIsPublishModalOpen(false)}
+        repoFullName={repoName}
+        token={token}
+        originalMetadata={originalMetadata}
+        proposedMetadata={effectiveProposed}
+        onPublishSuccess={(res) => {
+          setLastPublishedPr(res);
+        }}
+      />
     </div>
   );
 };

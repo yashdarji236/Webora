@@ -7,10 +7,13 @@ import userRoutes from "./routes/user.routes.js";
 import repositoryAnalysisRoutes from "./routes/repositoryAnalysisRoutes.js";
 import seoAuditRoutes from "./routes/seoAuditRoutes.js";
 import socialPreviewRoutes from "./routes/socialPreviewRoutes.js";
+import seoFixRoutes from "./routes/seoFixRoutes.js";
 import { githubCallback } from "./controllers/auth.controller.js";
 
-// Ensure .env is loaded regardless of process cwd
+// Ensure .env is loaded from Backend/.env first, then root workspace directory
+dotenv.config({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
 dotenv.config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
+dotenv.config();
 
 const app = express();
 
@@ -37,6 +40,11 @@ app.get("/github/callback", githubCallback);
 // User routes
 app.use("/api/user", userRoutes);
 app.use("/user", userRoutes);
+
+// AI-Powered Automated SEO Code Fix Engine (Feature 4 & Feature 5 Publish)
+app.use("/api/fixes", seoFixRoutes);
+app.use("/api/projects", seoFixRoutes);
+app.use("/api/repos", seoFixRoutes);
 
 // Visual Social & Search Previews routes (Feature 3)
 app.use("/api/previews", socialPreviewRoutes);

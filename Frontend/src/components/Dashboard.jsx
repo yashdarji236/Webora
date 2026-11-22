@@ -4,6 +4,7 @@ import { Navbar } from "./Navbar";
 import { RepositoryAnalysis } from "./RepositoryAnalysis";
 import { SeoAuditReport } from "./SeoAuditReport";
 import { SocialPreviews } from "./SocialPreviews";
+import AiFixEngine from "./AiFixEngine";
 import {
   LayoutGrid,
   Search,
@@ -240,12 +241,6 @@ export const Dashboard = () => {
   const [auditProgress, setAuditProgress] = useState(0);
 
   // Pull Requests and Fixes local memory
-  const [fixForm, setFixForm] = useState({
-    title: "",
-    description: "",
-    keywords: "",
-    ogImageUrl: "",
-  });
   const [createdPRs, setCreatedPRs] = useState([]);
 
   // ─── 4B. REPOSITORY ANALYSIS & FRAMEWORK DETECTION STATE (FEATURE 1) ────────
@@ -479,12 +474,6 @@ export const Dashboard = () => {
           const data = await res.json();
           if (data.success) {
             setRepoDetails(data);
-            setFixForm({
-              title: data.audit?.metadata?.title || data.repo?.name || "",
-              description: data.audit?.metadata?.description || data.repo?.description || "",
-              keywords: "",
-              ogImageUrl: data.audit?.metadata?.ogImage || "",
-            });
           }
         }
       } catch (err) {
@@ -987,78 +976,21 @@ export const Dashboard = () => {
                       />
                     )}
 
-                    {/* ─── TAB 3: FIXES ─── */}
+                    {/* ─── TAB 3: FIXES (FEATURE 4: AI CODE FIX ENGINE) ─── */}
                     {route.activeTab === "fixes" && (
-                      <div className="space-y-6 pb-20">
-                        <div>
-                          <h1 className="text-2xl font-bold text-white tracking-tight">Fixes & Metadata Editor</h1>
-                          <p className="text-xs text-neutral-400 mt-1">
-                            Customize page metadata for {repoDetails?.repo?.name || activeProject.name}.
-                          </p>
-                        </div>
-
-                        <div className="p-6 rounded-xl border border-[#22222A] bg-[#121216] space-y-4">
-                          <h2 className="text-base font-bold text-white">Root Page Metadata</h2>
-                          <div className="space-y-4">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                  Title Tag
-                                </label>
-                                <span className="text-[11px] font-mono text-neutral-400">
-                                  {fixForm.title.length}/60 chars
-                                </span>
-                              </div>
-                              <input
-                                type="text"
-                                value={fixForm.title}
-                                onChange={(e) => setFixForm({ ...fixForm, title: e.target.value })}
-                                className="w-full text-xs p-2.5 rounded bg-[#18181D] border border-[#2E2E38] text-white focus:outline-none"
-                              />
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                  Meta Description
-                                </label>
-                                <span className="text-[11px] font-mono text-neutral-400">
-                                  {fixForm.description.length}/160 chars
-                                </span>
-                              </div>
-                              <textarea
-                                rows={2}
-                                value={fixForm.description}
-                                onChange={(e) => setFixForm({ ...fixForm, description: e.target.value })}
-                                className="w-full text-xs p-2.5 rounded bg-[#18181D] border border-[#2E2E38] text-white focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="p-6 rounded-xl border border-[#22222A] bg-[#121216] space-y-3">
-                          <h2 className="text-base font-bold text-white">OpenGraph Preview Image URL</h2>
-                          <input
-                            type="url"
-                            placeholder="https://.../og-image.png"
-                            value={fixForm.ogImageUrl}
-                            onChange={(e) => setFixForm({ ...fixForm, ogImageUrl: e.target.value })}
-                            className="w-full text-xs p-2.5 rounded bg-[#18181D] border border-[#2E2E38] text-white focus:outline-none"
-                          />
-                        </div>
-
-                        {/* Sticky Bottom Action */}
-                        <div className="fixed bottom-0 left-0 md:left-64 right-0 bg-[#121216] border-t border-[#22222A] px-6 sm:px-10 py-3.5 flex items-center justify-between z-30 shadow-2xl">
-                          <span className="text-xs font-semibold text-white">Metadata configuration ready</span>
-                          <button
-                            onClick={handleCreatePR}
-                            className="px-4 py-2 bg-white text-black text-xs font-bold rounded-lg hover:bg-neutral-200 transition-colors flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <GitPullRequest size={14} />
-                            <span>Bundle into Pull Request</span>
-                          </button>
-                        </div>
-                      </div>
+                      <AiFixEngine
+                        projectId={route.repoSlug || activeProject.slug || activeProject.name}
+                        repoDetails={repoDetails}
+                        analysisData={analysisData}
+                        auditData={liveAuditData}
+                        isLoadingAudit={isLoadingLiveAudit}
+                        token={token}
+                        onNavigateToAudit={() => navigateToHash(`dashboard/${route.repoSlug}/audit`)}
+                        onStartAudit={() => {
+                          navigateToHash(`dashboard/${route.repoSlug}/audit`);
+                          runLiveAudit();
+                        }}
+                      />
                     )}
 
                     {/* ─── TAB 4: PULL REQUESTS ─── */}
